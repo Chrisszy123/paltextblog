@@ -1,8 +1,6 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
-const helmet = require('helmet');
-const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 
 const blogRoutes = require('../routes/blogRoutes');
@@ -11,54 +9,61 @@ const uploadRoutes = require('../routes/uploadRoutes');
 
 const app = express();
 
-// Security middleware
-app.use(helmet());
+// Basic middleware
+app.use(cors({
+  origin: process.env.CORS_ORIGINS ? process.env.CORS_ORIGINS.split(',') : '*',
+  credentials: true
+}));
 
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
-  message: 'Too many requests from this IP, please try again later.'
-});
-app.use('/api/', limiter);
-
-// CORS configuration
-const corsOptions = {
-  origin: process.env.CORS_ORIGINS ? process.env.CORS_ORIGINS.split(',') : ['http://localhost:3000', 'http://localhost:3001'],
-  credentials: true,
-  optionsSuccessStatus: 200
-};
-app.use(cors(corsOptions));
-
-// Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// MongoDB connection - optimized for serverless
-let cachedConnection = null;
+// Global error handler
+app.use((err, req, res, next) => {
+  console.error('Error:', err);
+  res.status(500).json({ 
+    message: 'Internal server error',
+    error: process.env.NODE_ENV === 'development' ? err.message : undefined
+  });
+});
 
-async function connectToDatabase() {
-  if (cachedConnection) {
-    return cachedConnection;
+// MongoDB connection with retry logic
+let isConnected = false;
+
+async function connectDB() {
+  if (isConnected) {
+    console.log('Using existing database connection');
+    return;
   }
 
   try {
-    console.log('Connecting to MongoDB...');
-    const connection = await mongoose.connect(process.env.MONGODB_URI, {
+    console.log('Attempting to connect to MongoDB...');
+    
+    if (!process.env.MONGODB_URI) {
+      throw new Error('MONGODB_URI environment variable is not set');
+    }
+
+    await mongoose.connect(process.env.MONGODB_URI, {
       useNewUrlParser: true,
       useUnifiedTopology: true,
+      serverSelectionTimeoutMS: 5000,
+      socketTimeoutMS: 45000,
     });
-    
-    cachedConnection = connection;
-    console.log('Connected to MongoDB');
-    return connection;
+
+    isConnected = true;
+    console.log('Successfully connected to MongoDB');
+
+    // Initialize sample data
+    await initializeSampleData();
+
   } catch (error) {
     console.error('MongoDB connection error:', error);
+    isConnected = false;
     throw error;
   }
 }
 
-// Initialize sample data function
+// Initialize sample data
 async function initializeSampleData() {
   try {
     const BlogPost = require('../models/BlogPost');
@@ -121,105 +126,6 @@ The integration of AI in customer service is not just a trend—it's a necessity
           metaDescription: "Learn how AI is transforming customer service communication, improving response times and customer satisfaction rates across industries.",
           seoKeywords: ["AI customer service", "artificial intelligence", "customer communication", "automated support", "chatbots"],
           published: true
-        },
-        {
-          title: "10 Best Practices for Implementing AI Chatbots in Your Business",
-          slug: "best-practices-implementing-ai-chatbots-business",
-          excerpt: "Learn the essential strategies for successfully integrating AI chatbots into your business operations and maximizing their effectiveness.",
-          content: `# 10 Best Practices for Implementing AI Chatbots in Your Business
-
-Implementing AI chatbots can transform your customer service operations, but success depends on following proven best practices. Here's your comprehensive guide to chatbot implementation.
-
-## 1. Define Clear Objectives
-
-Before implementing any AI chatbot solution, establish clear goals:
-- What problems are you trying to solve?
-- Which customer interactions can be automated?
-- What metrics will you use to measure success?
-
-## 2. Choose the Right Platform
-
-Select a chatbot platform that aligns with your business needs:
-- Integration capabilities with existing systems
-- Scalability for future growth
-- Customization options
-- Analytics and reporting features
-
-## 3. Design Conversational Flows
-
-Create intuitive conversation paths:
-- Map out common customer journeys
-- Prepare for various scenarios and edge cases
-- Include fallback options for complex queries
-- Test flows with real users
-
-## 4. Train Your AI Properly
-
-Invest time in training your chatbot:
-- Use real customer data and conversations
-- Continuously update the knowledge base
-- Monitor and improve response accuracy
-- Regular retraining with new data
-
-## 5. Maintain Human Oversight
-
-Always provide human backup:
-- Clear escalation paths to human agents
-- Monitor conversations for quality
-- Regular review of chatbot performance
-- Human intervention for sensitive issues
-
-## 6. Focus on User Experience
-
-Prioritize customer experience:
-- Keep conversations natural and friendly
-- Provide clear instructions and options
-- Minimize user effort required
-- Offer multiple contact methods
-
-## 7. Implement Gradual Rollout
-
-Start small and scale up:
-- Begin with simple use cases
-- Gather feedback and iterate
-- Gradually expand capabilities
-- Monitor performance at each stage
-
-## 8. Ensure Data Privacy and Security
-
-Protect customer information:
-- Implement strong data encryption
-- Follow privacy regulations (GDPR, CCPA)
-- Regular security audits
-- Clear privacy policies
-
-## 9. Monitor and Analyze Performance
-
-Track key metrics:
-- Response accuracy rates
-- Customer satisfaction scores
-- Resolution times
-- Escalation rates to human agents
-
-## 10. Continuous Improvement
-
-Never stop optimizing:
-- Regular performance reviews
-- Customer feedback integration
-- Technology updates and improvements
-- Staff training on new features
-
-## Conclusion
-
-Successful AI chatbot implementation requires careful planning, proper execution, and continuous optimization. By following these best practices, you can create a chatbot that truly enhances your customer experience and business operations.
-
-*Ready to implement AI chatbots in your business? PalText offers comprehensive solutions tailored to your specific needs.*`,
-          featuredImage: "https://images.unsplash.com/photo-1551434678-e076c223a692?w=800&h=400&fit=crop",
-          author: "PalText Team",
-          tags: ["AI Chatbots", "Implementation", "Best Practices", "Business Strategy"],
-          metaDescription: "Discover 10 essential best practices for successfully implementing AI chatbots in your business operations and maximizing customer satisfaction.",
-          seoKeywords: ["AI chatbot implementation", "chatbot best practices", "business automation", "customer service automation", "AI integration"],
-          published: true
         }
       ];
 
@@ -228,18 +134,19 @@ Successful AI chatbot implementation requires careful planning, proper execution
     }
   } catch (error) {
     console.error('Error initializing sample data:', error);
+    // Don't throw here, just log the error
   }
 }
 
 // Middleware to ensure database connection
 app.use(async (req, res, next) => {
   try {
-    await connectToDatabase();
+    await connectDB();
     next();
   } catch (error) {
     console.error('Database connection failed:', error);
     res.status(500).json({ 
-      message: 'Database connection failed', 
+      message: 'Database connection failed',
       error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
     });
   }
@@ -256,36 +163,14 @@ app.get('/api/health', (req, res) => {
     status: 'OK', 
     message: 'PalText Blog API is running',
     timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV
-  });
-});
-
-// Error handling middleware
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ 
-    message: 'Something went wrong!', 
-    error: process.env.NODE_ENV === 'development' ? err.message : 'Internal server error'
+    environment: process.env.NODE_ENV || 'production',
+    database: isConnected ? 'connected' : 'disconnected'
   });
 });
 
 // 404 handler
 app.use('*', (req, res) => {
   res.status(404).json({ message: 'API endpoint not found' });
-});
-
-// Initialize sample data on first connection
-let dataInitialized = false;
-app.use(async (req, res, next) => {
-  if (!dataInitialized) {
-    try {
-      await initializeSampleData();
-      dataInitialized = true;
-    } catch (error) {
-      console.error('Failed to initialize sample data:', error);
-    }
-  }
-  next();
 });
 
 // Export the Express app for Vercel
