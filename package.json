@@ -9,10 +9,17 @@
     "vercel-build": "echo 'Build complete'",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": ["blog", "api", "mongodb", "express", "paltext"],
+  "keywords": [
+    "blog",
+    "api",
+    "mongodb",
+    "express",
+    "paltext"
+  ],
   "author": "PalText Team",
   "license": "MIT",
   "dependencies": {
+    "@getbrevo/brevo": "^3.0.1",
     "bcryptjs": "^2.4.3",
     "cloudinary": "^1.41.3",
     "cors": "^2.8.5",
