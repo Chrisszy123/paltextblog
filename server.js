@@ -9,6 +9,7 @@ const blogRoutes = require('./routes/blogRoutes');
 const authRoutes = require('./routes/authRoutes');
 const uploadRoutes = require('./routes/uploadRoutes');
 const waitlistRoutes = require('./routes/waitlistRoutes');
+const sitemapRoutes = require('./routes/sitemapRoutes');
 
 const app = express();
 
@@ -77,6 +78,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/blog', blogRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/waitlist', waitlistRoutes);
+app.use('/api/sitemap', sitemapRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

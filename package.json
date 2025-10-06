@@ -7,7 +7,8 @@
     "start": "node server.js",
     "dev": "nodemon server.js",
     "vercel-build": "echo 'Build complete'",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "generate-sitemap": "node utils/generateSitemap.js"
   },
   "keywords": [
     "blog",
