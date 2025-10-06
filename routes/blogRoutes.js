@@ -247,6 +247,11 @@ router.get('/admin/posts/:id', authenticateToken, requireAdmin, async (req, res)
   try {
     const { id } = req.params;
 
+    // Validate the ID format
+    if (!id || id === 'undefined' || !id.match(/^[0-9a-fA-F]{24}$/)) {
+      return res.status(400).json({ message: 'Invalid blog post ID' });
+    }
+
     const post = await BlogPost.findById(id);
 
     if (!post) {
@@ -266,6 +271,11 @@ router.put('/admin/posts/:id', authenticateToken, requireAdmin, async (req, res)
   try {
     const { id } = req.params;
     const updateData = req.body;
+
+    // Validate the ID format
+    if (!id || id === 'undefined' || !id.match(/^[0-9a-fA-F]{24}$/)) {
+      return res.status(400).json({ message: 'Invalid blog post ID' });
+    }
 
     const post = await BlogPost.findByIdAndUpdate(
       id,
@@ -303,6 +313,11 @@ router.delete('/admin/posts/:id', authenticateToken, requireAdmin, async (req, r
   try {
     const { id } = req.params;
 
+    // Validate the ID format
+    if (!id || id === 'undefined' || !id.match(/^[0-9a-fA-F]{24}$/)) {
+      return res.status(400).json({ message: 'Invalid blog post ID' });
+    }
+
     const post = await BlogPost.findByIdAndDelete(id);
 
     if (!post) {
@@ -324,6 +339,11 @@ router.delete('/admin/posts/:id', authenticateToken, requireAdmin, async (req, r
 router.put('/admin/posts/:id/publish', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
+
+    // Validate the ID format
+    if (!id || id === 'undefined' || !id.match(/^[0-9a-fA-F]{24}$/)) {
+      return res.status(400).json({ message: 'Invalid blog post ID' });
+    }
 
     const post = await BlogPost.findById(id);
 

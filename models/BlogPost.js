@@ -9,7 +9,6 @@ const blogPostSchema = new mongoose.Schema({
   },
   slug: {
     type: String,
-    required: true,
     unique: true,
     lowercase: true,
     trim: true,
@@ -74,14 +73,19 @@ const blogPostSchema = new mongoose.Schema({
   timestamps: true
 });
 
+// Helper function to generate slug
+function generateSlug(title) {
+  return title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
 // Pre-save middleware to generate slug and calculate reading time
 blogPostSchema.pre('save', function(next) {
   // Generate slug from title if not provided
   if (!this.slug || this.isModified('title')) {
-    this.slug = this.title
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '');
+    this.slug = generateSlug(this.title);
   }
   
   // Calculate reading time (average 200 words per minute)
@@ -92,6 +96,27 @@ blogPostSchema.pre('save', function(next) {
   
   // Update the updatedAt field
   this.updatedAt = new Date();
+  
+  next();
+});
+
+// Pre-update middleware to handle slug generation for findOneAndUpdate
+blogPostSchema.pre('findOneAndUpdate', function(next) {
+  const update = this.getUpdate();
+  
+  // Generate slug if title is being updated and slug is not provided
+  if (update.title && !update.slug) {
+    update.slug = generateSlug(update.title);
+  }
+  
+  // Calculate reading time if content is being updated
+  if (update.content) {
+    const wordCount = update.content.split(/\s+/).length;
+    update.readingTime = Math.ceil(wordCount / 200);
+  }
+  
+  // Update the updatedAt field
+  update.updatedAt = new Date();
   
   next();
 });
